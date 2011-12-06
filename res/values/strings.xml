@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Droid X2 Bootstrapper</string>
+    <string name="flash">Change Mode</string>
+    <string name="reboot_recovery">Reboot</string>
+    <string name="reboot_checkbox">Reboot Into Recovery</string>
+    <string name="instructions">1. Select the checkbox to set recovery mode\n2. Push &quot;Change Mode&quot; to update your boot mode\n3. If successful, plug into a wall outlet and press &quot;Reboot&quot; to reboot into the selected mode.</string>
+</resources>

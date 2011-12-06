@@ -1,0 +1,98 @@
+#! /system/bin/sh
+
+PATH=/system/xbin:/system/bin:/preinstall
+
+logfile=/data/rec_log.txt
+
+USBMODE=$(getprop ro.usb_mode)
+
+echo " " >> $logfile
+echo `date` >> $logfile
+
+if [ "$USBMODE" == "debug" ]; then
+
+	if [ -f /data/.recovery_mode ]; then
+
+		echo "    Attempting 2nd-init!" >> $logfile
+		echo "    Remounting rootfs and system as rw" >> $logfile
+		echo "    Mounts Before:" >> $logfile
+		cat /proc/mounts >> $logfile
+		
+		# remount rootfs and system as rw
+		mount -o remount,rw rootfs /
+		mount -o remount,rw /dev/block/mmcblk0p12 /system
+		
+		echo "    Mounts After:" >> $logfile
+		cat /proc/mounts >> $logfile
+		
+		echo "    Renaming ADB" >> $logfile
+		# rename our old adb
+		mv /sbin/adb /sbin/adb.old
+		
+		echo "    Copying daemons and binaries to sbin" >> $logfile
+		cp /system/bin/servicemanager /sbin/servicemanager
+		cp /system/bin/nvrm_daemon /sbin/nvrm_daemon
+		
+		cp -f /system/etc/rootfs/init.rc /init.rc
+		cp -f /system/xbin/2nd-init /sbin/2nd-init
+		chmod 777 /sbin/2nd-init
+		cp -f /system/xbin/taskset /sbin/taskset
+		chmod 777 /sbin/taskset
+		
+		echo "    Our new sbin!" >> $logfile
+		ls -l /sbin >> $logfile
+		
+		echo "    Stopping stuff and 'enabling' adb" >> $logfile
+		# set some device properties
+		setprop ctl.stop runtime
+		setprop ctl.stop zygote
+		setprop persist.service.adb.enable 1
+		
+		echo "    persist.service.adb.enable is now:" >> $logfile
+		getprop persist.service.adb.enable >> $logfile
+		
+		echo "    Attempting to get to the preinstall" >> $logfile
+		mkdir /preinstall
+		chmod 777 /preinstall
+		mount -t ext3 /dev/block/mmcblk0p17 /preinstall
+		
+		sync
+
+		# this is a bad (and indirect way) of checking if we did 2nd-init
+		INIT_PROC=$(/sbin/taskset -p 1 | awk {'print $6'})
+		
+		echo $INIT_PROC >> $logfile
+		
+		if [ "$INIT_PROC" != "1" ]; then
+			# DO OUR 2ND-INIT!!!!
+			echo "    ATTEMPTING ACTUAL 2ND-INIT!!!" >> $logfile
+			
+			# now KILL EVERYTHING (this file for some reason isn't being copied, should be ok for now)
+			echo "    TRYING TO KILL EVERYTHING!!!" >> $logfile
+			chmod 777 /preinstall/hijack.killboot 2>&1 >> $logfile
+			/sbin/busybox sh /preinstall/hijack.killboot >> $logfile
+		
+			echo "    Doing first taskset" >> $logfile
+			/sbin/taskset -p -c 0 1 2>&1 >> $logfile
+			echo "    Firing taskset on our 2nd-init!" >> $logfile
+			/sbin/taskset -c 0 /sbin/2nd-init 2>&1 >> $logfile
+		else
+			echo "    ATTEMPTING RECOVERY START!!!" >> $logfile
+			setprop persist.service.adb.enable_NV_DISABLED 1
+			sleep 15s
+			mkdir -p /res/images
+			ps >> $logfile
+			# use our update binary to unzip our new system (this should just run recovery, but can't)
+			/preinstall/update-binary 2 0 /preinstall/update-recovery.zip 2>&1 >> $logfile
+		fi
+		
+	else
+	
+		/system/bin/charge_only_mode.bin "$@"
+	
+	fi
+else
+
+	/system/bin/charge_only_mode.bin "$@"
+
+fi

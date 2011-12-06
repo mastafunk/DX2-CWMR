@@ -1,0 +1,78 @@
+#!/system/bin/sh
+
+logfile=/data/rec_log.txt
+
+echo >> "    Inside kill all script." >> $logfile
+
+export PATH="/sbin:${PATH}"
+
+sleep 5s
+
+# kill all services
+for i in $(getprop | grep init.svc | sed -r 's/^\[init\.svc\.(.+)\]:.*$/\1/'); do
+	# stop this fucking service (or try to anyway)
+	echo "    Attempting to stop service:" >> $logfile
+	echo ${i} >> $logfile
+	stop ${i}
+	sleep 1
+done
+
+# unmount /tmp
+echo "    Attempting to unmount /tmp" >> $logfile
+for i in $(seq 1 10); do
+	TMP=$(mount | grep /tmp)
+	if [ -z "$TMP" ] ; then
+		break
+	fi
+	umount -l /tmp
+	sleep 1
+done
+
+# unmount all yaffs2 partitions
+echo "    Attempting to unmount any yaffs2 partitions" >> $logfile
+for i in $(seq 1 10); do
+	TMP=$(mount | grep yaffs2 | awk '{print $3}')
+
+	if [ -z "$TMP" ] ; then
+		echo "    Attempting to unmount:" >> $logfile
+		echo $TMP >> $logfile
+		break;
+	fi
+
+	for j in $(mount | grep yaffs2 | awk '{print $3}'); do
+		echo "    Attempting to unmount:" >> $logfile
+		echo $j >> $logfile
+		umount -l "$j"
+	done
+
+	sleep 1
+done
+
+# unmount all ext3 partitions
+echo "    Attempting to unmount any ext3 partitions" >> $logfile
+for i in $(seq 1 10); do
+	TMP=$(mount | grep ext3 | awk '{print $3}')
+
+	if [ -z "$TMP" ] ; then
+		echo "    Attempting to unmount:" >> $logfile
+		echo $TMP >> $logfile
+		break;
+	fi
+
+	for j in $(mount | grep ext3 | awk '{print $3}'); do
+		echo "    Attempting to unmount:" >> $logfile
+		echo $j >> $logfile
+		umount -l "$j"
+	done
+
+	sleep 1
+done
+
+# kill any existing adbd processes
+echo "    Attempting to kill any adbd running" >> $logfile
+kill $(ps | grep adbd)
+echo "msc_adb" > /dev/usb_device_mode
+
+# try to remove our sockets!
+echo "    Attempting to remove all sockets" >> $logfile
+rm -f /dev/socket/*
